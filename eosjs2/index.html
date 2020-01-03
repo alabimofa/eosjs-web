@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Tester</title>
+    <link rel="icon" href="./favicon.ico">
+
+        <script src='./script/eosjs-api-new.js'></script>
+        <script src='./script/beta3/eosjs-jsonrpc.js'></script>
+        <script src="./script/beta2/eosjs-debug.js"></script>
+        <script src='./script/beta2/eosjs-jsonrpc-debug.js'></script>
+    <!--
+        <script src='./script/beta3/eosjs-api-new.js'></script>
+    -->
+
+        <script src="./scatter/scatterjs-core.min.js"></script>
+        <script src="./scatter/scatterjs-plugin-eosjs2.min.js"></script>
+        <script src="./scatter/scatterjs-plugin-lynx.min.js"></script>
+        <!--
+        <script src='./script/eosjs-api.js'></script>
+        <script src='./script/eosjs-jsonrpc.js'></script>
+        <script src='./script/eosjs-jssig.js'></script>
+        -->
+
+    <script>
+        window.lynxMobile = {
+            requestSetAccountName:x => {
+                const accounts = [{
+                    name:'testaccount1',
+                    authority:'active',
+                    publicKey:'EOS5Jzkpde9pDNTPjyWqcHwvNkrXQma8VPV9qZ3fNu5dvZkiLEKxG',
+                    blockchain:'eos',
+                    isHardware:false,
+                    chainId:'EOS5Jzkpde9pDNTPjyWqcHwvNkrXQma8VPV9qZ3fNu5dvZkiLEKxG'
+                }];
+
+                const identity = {
+                    name:accounts[0].name,
+                    accounts,
+                    publicKey:'EOS8RFgis6KAbChv89L3ibPmSH9raqN3iaFWbyLrDgmAuV3rsZ9SM'
+                };
+
+                ScatterJS.scatter.identity = identity;
+                console.log(ScatterJS.scatter.identity);
+                return identity;
+            },
+            requestSetAccount:name => {},
+            requestArbitrarySignature:x => { console.log(x); },
+            requestSignature:x => { console.log(x); }
+        };
+    </script>
+
+</head>
+<body>
+<div id="network"></div>
+<div id="status"></div>
+<br><br>
+
+Action<br>
+<button onclick="login()">Login</button>
+<button onclick="logout()">Logout</button>
+<button onclick="authenticate()">Authenticate</button><br>
+
+<button onclick="transfer()">Transfer EOS</button>
+<button onclick="transfer2()">Transfer EOS  x 2</button><br>
+<button onclick="hookTransfer()">Hook Transfer EOS</button>
+<button onclick="hookTransfer2()">Hook Transfer EOS  x 2</button><br>
+
+<button onclick="transferpandora()">Transfer PANDORA</button>
+<button onclick="transferpandora2()">Transfer PANDORA  x 2</button><br>
+<button onclick="hookTransferPandora()">Hook Transfer PANDORA</button>
+<button onclick="hookTransferPandora2()">Hook Transfer PANDORA  x 2</button><br>
+
+<br><br>
+
+<script>
+
+    ScatterJS.plugins( new ScatterEOS(), new ScatterLynx({Api:eosjs_api.default, JsonRpc:eosjs_jsonrpc2.default}) );
+
+//# kylin
+    const network3 = ScatterJS.Network.fromJson({
+        blockchain:'eos',
+        chainId:'5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191',
+        host:'api-kylin.eoslaomao.com',
+        port:443,
+        protocol:'https'
+    });
+
+//# Jungle
+    const network = ScatterJS.Network.fromJson({
+        blockchain:'eos',
+        chainId:'e70aaab8997e1dfce58fbfac80cbbb8fecec7b99cf982a9444273cbc64c41473',
+        host:'jungle2.cryptolions.io',
+        port:443,
+        protocol:'https'
+    });
+
+//# Mainnet
+    const network2 = ScatterJS.Network.fromJson({
+        blockchain:'eos',
+        chainId:'aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906',
+        host:'nodes.get-scatter.com',
+        port:443,
+        protocol:'https'
+    });
+
+    const eosnetwork = document.getElementById('network');
+    eosnetwork.innerText = "network: " + network.host;
+
+    let scatter = null;
+
+    const beta3 = false;
+    const rpc = beta3
+        ? new eosjs_jsonrpc2.default(network.fullhost())
+        : new eosjs_jsonrpc.JsonRpc(network.fullhost());
+
+    const getApi = (signatureProvider) => beta3
+        ? new eosjs_api.default({ rpc, signatureProvider })
+        : new eosjs.Api({ rpc, signatureProvider });
+
+    const getScatterEos = () => beta3
+        ? scatter.eos(network, eosjs_api.default, {rpc, beta3:true})
+        : scatter.eos(network, eosjs.Api, {rpc});
+    //const getScatterEos = () => scatter.eos(network, eosjs_api.default, {rpc, beta3:true});
+
+    const setStatus = () => {
+        const status = document.getElementById('status');
+        if(!scatter) return status.innerText = 'No Scatter';
+        if(!scatter.identity) return status.innerText = 'No Identity';
+        //status.innerText = scatter.identity.name;
+        status.innerText = scatter.identity.accounts.find(x => x.blockchain === 'eos').name + " - " + scatter.identity.name;
+    };
+
+    setStatus();
+    setInterval(() => { setStatus(); }, 50);
+
+    ScatterJS.scatter.connect('eosjs2-test', {network}).then(connected => {
+        if(!connected) return false;
+        scatter = ScatterJS.scatter;
+    });
+
+    window.login = async () => await scatter.login();
+    window.logout = () => scatter.logout();
+    window.authenticate = async () => {
+        const getRandom = () => Math.round(Math.random() * 8 + 1).toString();
+        let randomString = '';
+        for(let i = 0; i < 12; i++) randomString += getRandom();
+        console.log('randomString', randomString);
+        await scatter.authenticate(randomString).then(res => console.log(res));
+    };
+
+    window.transfer = async () => {
+        const api = getScatterEos();
+        tryTransfer(api);
+    };
+
+    window.transfer2 = async () => {
+        const api = getScatterEos();
+        tryTransfer2(api);
+    };
+
+    window.hookTransfer = async () => {
+        const api = getApi(scatter.eosHook(network));
+        const from = scatter.identity.accounts[0];
+        tryTransfer(api);
+    };
+
+    window.hookTransfer2 = async () => {
+        const api = getApi(scatter.eosHook(network));
+        const from = scatter.identity.accounts[0];
+        tryTransfer2(api);
+    };
+
+    window.transferpandora = async () => {
+        const api = getScatterEos();
+        tryTransferPandora(api);
+    };
+
+    window.transferpandora2 = async () => {
+        const api = getScatterEos();
+        tryTransferPandora2(api);
+    };
+
+    window.hookTransferPandora = async () => {
+        const api = getApi(scatter.eosHook(network));
+        const from = scatter.identity.accounts[0];
+        tryTransferPandora(api);
+    };
+
+    window.hookTransferPandora2 = async () => {
+        const api = getApi(scatter.eosHook(network));
+        const from = scatter.identity.accounts[0];
+        tryTransferPandora2(api);
+    };
+
+    const CPU_PAYER = 'freecputoken';
+    const CPU_FUNCTION = 'payforcpu';
+    const CPU_PERMISSION = 'payforcpu';
+
+    const tryTransfer = async api => {
+        try {
+            const from = scatter.account('eos');
+            const result = await api.transact({
+                actions: [{
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{
+                        actor: from.name,
+                        permission: from.authority,
+                    }],
+                    data: {
+                        from: from.name,
+                        to: 'synctransfer',
+                        quantity: '10.0000 EOS',
+                        memo: from.name,
+                    },
+                }]
+            }, {
+                blocksBehind: 3,
+                expireSeconds: 30,
+            });
+            console.log('result', result);
+            return result;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    const tryTransfer2 = async api => {
+        try {
+            const from = scatter.account('eos');
+            const result = await api.transact({
+                actions: [{
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{
+                        actor: from.name,
+                        permission: from.authority,
+                    }],
+                    data: {
+                        from: from.name,
+                        to: 'synctransfer',
+                        quantity: '10.0000 EOS',
+                        memo: from.name,
+                    },
+                },{
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{
+                        actor: from.name,
+                        permission: from.authority,
+                    }],
+                    data: {
+                        from: from.name,
+                        to: 'freecputoken',
+                        quantity: '10.0000 EOS',
+                        memo: from.name,
+                    },
+                }]
+            }, {
+                blocksBehind: 3,
+                expireSeconds: 30,
+            });
+            console.log('result', result);
+            return result;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    const tryTransferPandora = async api => {
+        try {
+            const from = scatter.account('eos');
+            const result = await api.transact({
+                actions: [{
+                    account: 'cdcdxtokenee',
+                    name: 'transfer',
+                    authorization: [{
+                        actor: from.name,
+                        permission: from.authority,
+                    }],
+                    data: {
+                        from: from.name,
+                        to: 'synctransfer',
+                        quantity: '10.0000 PANDORA',
+                        memo: from.name,
+                    },
+                }]
+            }, {
+                blocksBehind: 3,
+                expireSeconds: 30,
+            });
+            console.log('result', result);
+            return result;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    const tryTransferPandora2 = async api => {
+        try {
+            const from = scatter.account('eos');
+            const result = await api.transact({
+                actions: [{
+                    account: 'cdcdxtokenee',
+                    name: 'transfer',
+                    authorization: [{
+                        actor: from.name,
+                        permission: from.authority,
+                    }],
+                    data: {
+                        from: from.name,
+                        to: 'synctransfer',
+                        quantity: '10.0000 PANDORA',
+                        memo: from.name,
+                    },
+                },{
+                    account: 'cdcdxtokenee',
+                    name: 'transfer',
+                    authorization: [{
+                        actor: from.name,
+                        permission: from.authority,
+                    }],
+                    data: {
+                        from: from.name,
+                        to: 'freecputoken',
+                        quantity: '10.0000 PANDORA',
+                        memo: from.name,
+                    },
+                }]
+            }, {
+                blocksBehind: 3,
+                expireSeconds: 30,
+            });
+            console.log('result', result);
+            return result;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+</script>
+</body>
+</html>
